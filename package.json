@@ -14,16 +14,26 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@mdi/js": "^7.4.47",
     "@tailwindcss/vite": "^4.1.11",
+    "@vueuse/core": "^13.5.0",
+    "globe.gl": "^2.42.0",
     "tailwindcss": "^4.1.11",
+    "three": "^0.178.0",
+    "three-globe": "^2.43.0",
+    "topojson-client": "^3.1.0",
     "vue": "^3.5.17",
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.53.1",
     "@tsconfig/node22": "^22.0.2",
+    "@types/geojson": "^7946.0.16",
     "@types/jsdom": "^21.1.7",
     "@types/node": "^22.15.32",
+    "@types/three": "^0.178.1",
+    "@types/topojson-client": "^3.1.5",
+    "@types/topojson-specification": "^1.0.5",
     "@vitejs/plugin-vue": "^6.0.0",
     "@vitest/eslint-plugin": "^1.2.7",
     "@vue/eslint-config-typescript": "^14.5.1",

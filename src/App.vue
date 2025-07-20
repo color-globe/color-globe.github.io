@@ -1,85 +1,39 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
+import BaseIcon from '@/components/BaseIcon.vue'
+import ThemeSelector from '@/components/ThemeSelector.vue'
+import { mdiGithub } from '@mdi/js'
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+  <div class="flex flex-col min-h-screen">
+    <nav class="bg-white dark:bg-gray-800 shadow-md">
+      <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-8">
+          <RouterLink to="/" class="flex items-center space-x-2 font-bold text-xl text-gray-800 dark:text-white">
+            <img src="@/assets/logo.svg" alt="Logo" class="h-8 w-8" />
+            <span>ColorGlobe</span>
+          </RouterLink>
+          <RouterLink to="/globe" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Globe
+          </RouterLink>
+          <RouterLink to="/blog" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Blog
+          </RouterLink>
+        </div>
+        <div class="flex items-center space-x-6">
+          <ThemeSelector />
+          <a href="https://github.com/color-globe/color-globe.github.io" target="_blank" rel="noopener"
+            class="ml-2 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition" aria-label="GitHub">
+            <BaseIcon class="w-6 h-6" :path="mdiGithub" />
+          </a>
+        </div>
+      </div>
+    </nav>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
+    <main class="flex-1 container mx-auto px-4 py-8">
+      <RouterView />
+    </main>
 
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-
-  <RouterView />
+    <footer class="bg-gray-100 dark:bg-gray-800 text-center py-4 text-gray-500 text-sm">
+      Color Globe
+    </footer>
+  </div>
 </template>
-
-<style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
-}
-
-nav a.router-link-exact-active {
-  color: var(--color-text);
-}
-
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
-}
-
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
-}
-
-nav a:first-of-type {
-  border: 0;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
-  }
-}
-</style>

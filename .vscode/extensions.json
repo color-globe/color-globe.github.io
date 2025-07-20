@@ -4,6 +4,7 @@
     "vitest.explorer",
     "ms-playwright.playwright",
     "dbaeumer.vscode-eslint",
-    "EditorConfig.EditorConfig"
+    "EditorConfig.EditorConfig",
+    "bradlc.vscode-tailwindcss"
   ]
 }
