@@ -15,7 +15,7 @@ import { mdiGithub } from '@mdi/js'
           </RouterLink>
           <RouterLink to="/globe" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Globe
           </RouterLink>
-          <RouterLink to="/blog" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Blog
+          <RouterLink to="/docs" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Docs
           </RouterLink>
         </div>
         <div class="flex items-center space-x-6">

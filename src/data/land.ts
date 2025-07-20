@@ -1,20 +1,10 @@
 import * as topojson from 'topojson-client'
-import type {
-  FeatureCollection,
-  Geometry,
-  GeoJsonProperties
-} from 'geojson'
-import type {
-  Topology,
-  Objects
-} from 'topojson-specification'
+import type { FeatureCollection, Geometry, GeoJsonProperties } from 'geojson'
+import type { Topology, Objects } from 'topojson-specification'
 
-// https://unpkg.com/world-atlas@2.0.2/land-110m.json
-import landTopo from './land.json'
+import { landTopo } from './land-data'
 
-function isFeatureCollection(
-  feature: unknown
-): feature is FeatureCollection<Geometry, GeoJsonProperties> {
+function isFeatureCollection(feature: unknown): feature is FeatureCollection<Geometry, GeoJsonProperties> {
   return (
     typeof feature === 'object' &&
     feature !== null &&
