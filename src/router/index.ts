@@ -10,9 +10,24 @@ const router = createRouter({
       component: HomeView,
     },
     {
+      path: '/cylinder',
+      name: 'cylinder',
+      component: () => import('../views/CylinderView.vue'),
+    },
+    {
+      path: '/bicone',
+      name: 'bicone',
+      component: () => import('../views/BiconeView.vue'),
+    },
+    {
       path: '/globe',
       name: 'globe',
       component: () => import('../views/GlobeView.vue'),
+    },
+    {
+      path: '/globe2',
+      name: 'globe2',
+      component: () => import('../views/Globe2View.vue'),
     },
     {
       path: '/docs',

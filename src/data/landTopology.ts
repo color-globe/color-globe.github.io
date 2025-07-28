@@ -1,5 +1,17 @@
-// https://unpkg.com/world-atlas@2.0.2/land-110m.json
-export const landTopo = {
+import { feature } from 'topojson-client'
+import type { Topology } from 'topojson-specification'
+
+interface FeatureCollection { // from 'geojson'
+  features: object[]
+}
+
+export function getFeatures(): object[] {
+  const t = landTopology as unknown as Topology
+  return (feature(t, t.objects.land) as FeatureCollection).features
+}
+
+// from https://unpkg.com/world-atlas@2.0.2/land-110m.json
+export const landTopology = {
   type: 'Topology',
   objects: {
     land: {

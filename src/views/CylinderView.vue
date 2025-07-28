@@ -1,5 +1,6 @@
 <template>
   <div class="flex">
+    <!-- 좌측: 3D + 2D -->
     <div>
       <div class="mb-2 space-x-4">
         <label><input type="checkbox" v-model="enabledSimpleColors" /> Show Simple Colors</label>
@@ -7,40 +8,33 @@
         <label><input type="checkbox" v-model="enabledGrayTailwind" /> Show Tailwind Gray</label>
         <label><input type="checkbox" v-model="enabledCities" /> Show Cities</label>
         <label><input type="checkbox" v-model="enabledGamutPoints" /> Show Gamut Points</label>
-        <label><input type="checkbox" v-model="showName" /> Show Name</label>
-        <label><input type="checkbox" v-model="showGeo" /> Show Geo</label>
       </div>
 
-      <div class="mb-1 font-bold">지구본</div>
       <div ref="container" class="relative w-[800px] h-[600px] border mb-4">
         <canvas ref="canvas" width="800" height="600" class="absolute top-0 left-0"></canvas>
       </div>
 
-      <div class="mb-1 font-bold">평면도</div>
       <div class="relative w-[800px] h-[300px] border">
         <canvas ref="canvas2" width="800" height="300" class="absolute top-0 left-0"></canvas>
       </div>
     </div>
 
+    <!-- 우측: 구면좌표계 + 극좌표계 -->
     <div class="flex flex-col ml-4">
-      <div class="mb-1 font-bold">극지도</div>
       <div class="relative w-[400px] h-[400px] border mb-4">
-        <canvas ref="canvas3" width="400" height="400" class="absolute top-0 left-0"></canvas>
-      </div>
-
-      <div class="mb-1 font-bold">정면도</div>
-      <div class="relative w-[400px] h-[400px] border">
         <canvas ref="canvas4" width="400" height="400" class="absolute top-0 left-0"></canvas>
+      </div>
+      <div class="relative w-[400px] h-[400px] border">
+        <canvas ref="canvas3" width="400" height="400" class="absolute top-0 left-0"></canvas>
       </div>
     </div>
   </div>
 </template>
 
-
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import Color from 'colorjs.io';
 import tailwindColors from 'tailwindcss/colors';
-import { type Geo, colorToGeo } from '@/lib/color';
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 const canvas2 = ref<HTMLCanvasElement | null>(null);
@@ -49,38 +43,39 @@ const canvas4 = ref<HTMLCanvasElement | null>(null);
 const container = ref<HTMLDivElement | null>(null);
 
 const enabledSimpleColors = ref(true);
-const enabledChromaTailwind = ref(false);
-const enabledGrayTailwind = ref(true);
+const enabledChromaTailwind = ref(true);
+const enabledGrayTailwind = ref(false);
 const enabledCities = ref(true);
 const enabledGamutPoints = ref(false);
-const showName = ref(true);
-const showGeo = ref(false);
-
 
 type PointType = 'tailwind-chroma' | 'tailwind-gray' | 'simple' | 'city' | 'gamut';
 
-interface HSL {
-  H: number;
-  S: number;
+interface LCH {
   L: number;
+  C: number;
+  H: number;
 }
 
 interface Point {
   color: string;
   name: string;
-  geo: Geo;
+  LCH: LCH;
   type: PointType;
 }
 
 const points: Point[] = [];
 const gamutPoints: Point[] = [];
 
-function calcGeo(hsl: HSL): Geo {
-  const { H, S, L } = hsl;
-  const lat = (L - 0.5) * Math.PI;
-  const lon = (H % 360) * Math.PI / 180;
-  const alt = Math.cos(lat) * S;
-  return { lat, lon, alt };
+function colorToLCH(color: string): LCH {
+  const { coords } = new Color(color).to('oklch');
+  const [L, C, H] = coords.map(c => c ?? 0);
+  return { L, C, H };
+}
+
+function getCmaxForOklch(l: number): number {
+  const maxC = 0.4;
+  const weight = 1 - 4 * (l - 0.5) ** 2;
+  return maxC * Math.max(0, weight);
 }
 
 function isChromaColor(name: string) {
@@ -89,8 +84,8 @@ function isChromaColor(name: string) {
 }
 
 function addColor(name: string, color: string, type: PointType) {
-  const geo = colorToGeo(color);
-  points.push({ name, color, geo, type });
+  const LCH = colorToLCH(color);
+  points.push({ name, color, LCH, type });
 }
 
 for (const [name, colorObj] of Object.entries(tailwindColors)) {
@@ -124,160 +119,105 @@ const cityPoints = [
   { name: 'London', lat: 51.5074, lon: -0.1278 },
 ];
 cityPoints.forEach(({ name, lat, lon }) => {
-  const HSL = latLonToOkhsl(lat, lon);
-  const color = `okhsl(${HSL.H} ${HSL.S} ${HSL.L})`;
-  const geo = calcGeo(HSL);
-  points.push({ name, color, geo, type: 'city' });
+  const { L, C, H } = latLonToOklch(lat, lon);
+  const color = getColorFromOklch(L, C, H);
+  points.push({ name, color, LCH: { L, C, H }, type: 'city' });
 });
 
 for (let l = 0; l <= 1.00001; l += 0.05) {
   for (let h = 0; h < 360; h += 10) {
-    const S = 1;
-    const HSL = { H: h, S, L: l };
-    const color = `okhsl(${h} ${S} ${l})`;
-    const geo = calcGeo(HSL);
-    gamutPoints.push({
-      name: `(${h.toFixed(0)},${l.toFixed(1)})`,
-      color,
-      geo,
-      type: 'gamut',
-    });
+    const C = getCmaxForOklch(l);
+    if (C > 0) {
+      const color = `oklch(${(l * 100).toFixed(1)}% ${C.toFixed(3)} ${h})`;
+      gamutPoints.push({
+        name: `(${h.toFixed(0)},${l.toFixed(1)})`,
+        color,
+        LCH: { L: l, C, H: h },
+        type: 'gamut',
+      });
+    }
   }
 }
 
 let zoom = 1;
-const offsetY = 0;
-const tilt = 0;
-let axisTilt = 23.5 * Math.PI / 180; // 초기값: 23.5도
+let offsetY = 0;
 let hueOffset = 0;
 let isDragging = false;
 let lastX = 0, lastY = 0;
 
-function projectSpherical3D(geo: Geo) {
-  const { lat, lon, alt: r } = geo;
-
-  const adjLon = lon + hueOffset * Math.PI / 180;
-
-  const scale = 250;
+function projectCylindrical3D(lch: LCH) {
+  const { L, C, H } = lch;
+  const theta = Math.PI / 6;
+  const phi = 23.5 * Math.PI / 180;
+  const scale = 300;
   const centerX = 400;
   const centerY = 300;
 
-  let x = r * Math.sin(adjLon);
-  let y = -Math.sin(lat); // 밝을수록 위
-  let z = r * Math.cos(adjLon);
+  const rad = ((H + hueOffset) % 360) * Math.PI / 180;
 
-  const x0 = x;
-  const y0 = y;
+  let x = C * Math.cos(rad);
+  let y = 1 - L;
+  let z = C * Math.sin(rad);
 
-  const x2 = x0 * Math.cos(tilt) - y0 * Math.sin(tilt);
-  const y2 = x0 * Math.sin(tilt) + y0 * Math.cos(tilt);
-  x = x2;
-  y = y2;
-
-  // 회전 1: XZ 평면 (지구 측면 기울기)
-  const theta = Math.PI / 6;
   const x1 = x * Math.cos(theta) + z * Math.sin(theta);
   const z1 = -x * Math.sin(theta) + z * Math.cos(theta);
   x = x1;
   z = z1;
 
-  // 회전 2: YZ 평면 (지구축 기울기)
-  const phi = axisTilt;
   const y1 = y * Math.cos(phi) + z * Math.sin(phi);
   const z2 = -y * Math.sin(phi) + z * Math.cos(phi);
   y = y1;
   z = z2;
 
-  const depthScale = 1 / (1 + Math.max(z, 0.01));
-  const finalScale = 0.5 + depthScale * 0.5;
-
   return {
     x: centerX + x * scale * zoom,
     y: centerY + y * scale * zoom + offsetY,
     z,
-    scale: finalScale,
+    scale: 0.8 + (1 - z) * 0.5,
   };
 }
 
-function projectFlat(geo: Geo) {
-  const H = (geo.lon * 180 / Math.PI + hueOffset) % 360;
-  const L = geo.lat / Math.PI + 0.5;
-
-  const x = (H / 360) * 800;
+function projectFlat(lch: LCH) {
+  const { H, L } = lch;
+  const adjustedHue = (H + hueOffset) % 360;
+  const x = adjustedHue / 360 * 800;
   const y = (1 - L) * 300;
   return { x, y };
 }
 
-function projectPolar(geo: Geo) {
-  const H = (geo.lon * 180 / Math.PI + hueOffset) % 360;
-
+function projectPolar(lch: LCH) {
+  const { H, C } = lch;
   const cx = 200;
   const cy = 200;
-  const maxR = 180;
-  const r = geo.alt * maxR;  // ✅ 채도 기반 반지름
-
-  const rad = H * Math.PI / 180;
+  const r = Math.min(180, C / 0.5 * 180);
+  const rad = ((H + hueOffset) % 360) * Math.PI / 180;
   return {
     x: cx + r * Math.cos(rad),
     y: cy + r * Math.sin(rad),
   };
 }
 
-function projectFront(geo: Geo) {
-  const { lat, lon, alt } = geo;
-
-  const r = alt * 180;
-  const cx = 200;
-  const cy = 200;
-
-  const adjustedLon = lon + hueOffset * Math.PI / 180;
-
-  const x = cx + r * Math.sin(adjustedLon);
-  const y = cy - r * Math.sin(lat);
-
+function projectSpherical(lch: LCH) {
+  const { L, C, H } = lch;
+  const baseRadius = 140;
+  const elevation = C / 0.5 * 40;
+  const radius = baseRadius + elevation;
+  const lat = (L - 0.5) * Math.PI;
+  const lon = ((H + hueOffset) % 360) * Math.PI / 180;
+  const x = 200 + radius * Math.cos(lat) * Math.sin(lon);
+  const y = 200 - radius * Math.sin(lat);
   return { x, y };
 }
 
 function render(ctx: CanvasRenderingContext2D) {
   ctx.clearRect(0, 0, 800, 600);
 
-  // 위도선 (L 기준)
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
   ctx.lineWidth = 1;
-  for (let latDeg = -80; latDeg <= 80; latDeg += 20) {
-    const lat = (latDeg / 180) * Math.PI;
-    const path = [];
-    for (let h = 0; h <= 360; h += 5) {
-      const lon = (h * Math.PI) / 180;
-      const S = 1;
-      // const L = lat / Math.PI + 0.5;
-      const geo: Geo = {
-        lat,
-        lon: lon + hueOffset * Math.PI / 180,
-        alt: Math.cos(lat) * S
-      };
-      const proj = projectSpherical3D(geo);
-      path.push({ x: proj.x, y: proj.y });
-    }
-    ctx.beginPath();
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-    ctx.stroke();
-  }
-
-  // 경도선 (H 기준)
   for (let h = 0; h < 360; h += 30) {
-    const lon = (h * Math.PI) / 180;
     const path = [];
-    for (let l = 0.01; l < 1; l += 0.02) {
-      const lat = (l - 0.5) * Math.PI;
-      const S = 1;
-      const geo: Geo = {
-        lat,
-        lon: lon + hueOffset * Math.PI / 180,
-        alt: Math.cos(lat) * S
-      };
-      const proj = projectSpherical3D(geo);
+    for (let l = 0; l <= 1; l += 0.05) {
+      const proj = projectCylindrical3D({ L: l, C: 0.5, H: h });
       path.push({ x: proj.x, y: proj.y });
     }
     ctx.beginPath();
@@ -286,20 +226,17 @@ function render(ctx: CanvasRenderingContext2D) {
     ctx.stroke();
   }
 
-  // 포인트 렌더링 (깊이 정렬)
   const projected = getAllVisiblePoints()
-    .map(p => ({ ...projectSpherical3D(p.geo), p }))
-    .sort((a, b) => a.z - b.z); // z 깊이순 정렬
+    .map(p => ({ ...projectCylindrical3D(p.LCH), p }))
+    .sort((a, b) => a.z - b.z);
 
   for (const { x, y, scale, p } of projected) {
-    renderPoint(ctx, x, y, p, 4 * scale, 10 * scale);
+    renderPoint(ctx, x, y, p.color, p.name, 4 * scale, 10 * scale);
   }
 }
 
 function renderFlat(ctx: CanvasRenderingContext2D) {
   ctx.clearRect(0, 0, 800, 300);
-
-  // H 축 그리드 (세로선)
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   for (let h = 0; h <= 360; h += 30) {
@@ -309,8 +246,6 @@ function renderFlat(ctx: CanvasRenderingContext2D) {
     ctx.lineTo(x, 300);
     ctx.stroke();
   }
-
-  // L 축 그리드 (가로선)
   for (let l = 0; l <= 1.001; l += 0.1) {
     const y = (1 - l) * 300;
     ctx.beginPath();
@@ -319,17 +254,14 @@ function renderFlat(ctx: CanvasRenderingContext2D) {
     ctx.stroke();
   }
 
-  // 점들 렌더링
   for (const p of getAllVisiblePoints()) {
-    const { x, y } = projectFlat(p.geo);
-    renderPoint(ctx, x, y, p);
+    const { x, y } = projectFlat(p.LCH);
+    renderPoint(ctx, x, y, p.color, p.name);
   }
 }
 
 function renderPolar(ctx: CanvasRenderingContext2D) {
   ctx.clearRect(0, 0, 400, 400);
-
-  // H 축 방사선
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   for (let h = 0; h < 360; h += 30) {
@@ -339,71 +271,48 @@ function renderPolar(ctx: CanvasRenderingContext2D) {
     ctx.lineTo(200 + 180 * Math.cos(rad), 200 + 180 * Math.sin(rad));
     ctx.stroke();
   }
-
-  // S 축 원형 가이드
-  for (let s = 0.1; s <= 1.001; s += 0.2) {
+  for (let c = 0.1; c <= 0.5; c += 0.1) {
     ctx.beginPath();
-    ctx.arc(200, 200, s * 180, 0, Math.PI * 2);
+    ctx.arc(200, 200, c / 0.5 * 180, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  // 점 그리기
   for (const p of getAllVisiblePoints()) {
-    const { x, y } = projectPolar(p.geo); // 🔄 변경
-    renderPoint(ctx, x, y, p);
+    const { x, y } = projectPolar(p.LCH);
+    renderPoint(ctx, x, y, p.color, p.name);
   }
 }
 
-function renderFront(ctx: CanvasRenderingContext2D) {
+function renderSpherical(ctx: CanvasRenderingContext2D) {
   ctx.clearRect(0, 0, 400, 400);
-
-  const cx = 200;
-  const cy = 200;
-  const maxR = 180;
-
-  // ⚪️ 원형 경계선
-  ctx.beginPath();
-  ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // 🌀 위도선 (수평)
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  for (let latDeg = -60; latDeg <= 60; latDeg += 30) {
-    const lat = (latDeg / 180) * Math.PI;
-    const y = cy - Math.sin(lat) * maxR;
-
+  ctx.lineWidth = 1;
+  for (let h = 0; h < 360; h += 30) {
     ctx.beginPath();
-    ctx.moveTo(cx - maxR, y);
-    ctx.lineTo(cx + maxR, y);
+    for (let l = 0; l <= 1.0; l += 0.05) {
+      const { x, y } = projectSpherical({ L: l, C: 0.4, H: h });
+      if (l === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
     ctx.stroke();
   }
 
-  // 🌀 경도선 (수직)
-  for (let lonDeg = -150; lonDeg <= 150; lonDeg += 30) {
-    const lon = (lonDeg / 180) * Math.PI;
-    const x = cx + Math.sin(lon) * maxR;
-
-    ctx.beginPath();
-    ctx.moveTo(x, cy - maxR);
-    ctx.lineTo(x, cy + maxR);
-    ctx.stroke();
-  }
-
-  // 🌈 점 그리기
   for (const p of getAllVisiblePoints()) {
-    const { x, y } = projectFront(p.geo);  // ← 새 투영 함수
-    renderPoint(ctx, x, y, p);
+    const { x, y } = projectSpherical(p.LCH);
+    renderPoint(ctx, x, y, p.color);
   }
 }
 
-function latLonToOkhsl(lat: number, lon: number): HSL {
+function latLonToOklch(lat: number, lon: number): LCH {
   const L = (lat + 90) / 180;
   const H = (lon + 360) % 360;
-  const Seff = 1 - 4 * (L - 0.5) ** 2;
-  const S = Math.min(1, Math.max(0, Seff));
-  return { L, S, H };
+  const Ceff = 1 - 4 * (L - 0.5) ** 2;
+  const C = 0.4 * Math.max(0, Ceff);
+  return { L, C, H };
+}
+
+function getColorFromOklch(L: number, C: number, H: number): string {
+  return `oklch(${(L * 100).toFixed(1)}% ${C.toFixed(3)} ${H.toFixed(1)})`;
 }
 
 function getAllVisiblePoints(): Point[] {
@@ -420,33 +329,16 @@ function shouldShowPoint(p: Point): boolean {
   );
 }
 
-function renderPoint(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  p: Point,
-  radius = 4,
-  fontSize = 10
-) {
-  ctx.fillStyle = p.color;
+function renderPoint(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, label?: string, radius = 4, fontSize = 10) {
+  ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();
 
-  const labels: string[] = [];
-
-  if (showName.value) labels.push(p.name);
-
-  if (showGeo.value) {
-    const { lat, lon, alt } = p.geo;
-    const geoText = `(${lat.toFixed(0)}° ${lon.toFixed(0)}° ${Math.round(100 * alt)}%)`;
-    labels.push(geoText);
-  }
-
-  if (labels.length > 0) {
+  if (label) {
     ctx.fillStyle = 'white';
     ctx.font = `${fontSize}px sans-serif`;
-    ctx.fillText(labels.join(''), x + radius + 2, y + fontSize / 2);
+    ctx.fillText(label, x + radius + 2, y + fontSize / 2);
   }
 }
 
@@ -455,22 +347,13 @@ onMounted(() => {
   const ctx2 = canvas2.value!.getContext('2d')!;
   const ctx3 = canvas3.value!.getContext('2d')!;
   const ctx4 = canvas4.value!.getContext('2d')!;
-
   const rerender = () => {
     render(ctx);
     renderFlat(ctx2);
     renderPolar(ctx3);
-    renderFront(ctx4);
+    renderSpherical(ctx4);
   };
   rerender();
-
-  // 🌀 자동 회전
-  setInterval(() => {
-    if (!isDragging) {
-      hueOffset = (hueOffset + 0.3) % 360;
-      rerender();
-    }
-  }, 50); // 50ms마다 0.3도 회전 → 약 6초에 1바퀴
 
   container.value!.addEventListener('mousedown', e => {
     isDragging = true;
@@ -483,9 +366,7 @@ onMounted(() => {
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
     hueOffset -= dx * 0.5;
-    axisTilt += dy * 0.005;
-    axisTilt = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, axisTilt)); // 제한: ±90도
-
+    offsetY += dy;
     lastX = e.clientX;
     lastY = e.clientY;
     rerender();

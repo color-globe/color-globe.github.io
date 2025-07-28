@@ -1,0 +1,239 @@
+<template>
+  <div>
+    <div class="mb-2 space-x-4">
+      <label><input type="checkbox" v-model="enabledSimpleColors" /> Show Simple Colors</label>
+      <label><input type="checkbox" v-model="enabledTailwindColors" /> Show Tailwind Colors</label>
+      <label><input type="checkbox" v-model="enabledCities" /> Show Cities</label>
+    </div>
+    <div ref="container" class="relative w-[800px] h-[600px] border">
+      <canvas ref="canvas" width="800" height="600" class="absolute top-0 left-0"></canvas>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import tailwindColors from 'tailwindcss/colors';
+import { colorToHCL, colorToOklch, getCmaxForOklch } from '@/utils/color';
+
+const canvas = ref<HTMLCanvasElement | null>(null);
+const container = ref<HTMLDivElement | null>(null);
+
+const enabledCities = ref(true);
+const enabledSimpleColors = ref(true);
+const enabledTailwindColors = ref(false);
+
+interface Point {
+  color: string;
+  name: string;
+  lat: number;
+  lon: number;
+  radius: number;
+}
+type SeriesType = 'tailwind' | 'simple';
+interface Series {
+  series: Point[];
+  stroke: string;
+  type: SeriesType;
+}
+
+const allSeries: Series[] = [];
+const points: Point[] = [];
+
+// Tailwind 색상 처리
+for (const [name, colorObj] of Object.entries(tailwindColors)) {
+  if (typeof colorObj === 'object' && colorObj !== null) {
+    const series: Point[] = [];
+    for (const step of ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950']) {
+      const val = colorObj[step as keyof typeof colorObj];
+      if (typeof val !== 'string') continue;
+
+      const { H, C, L } = colorToHCL(val);
+
+      const lat = -90 + L * 180;
+      const lon = H;
+      const radius = Math.sqrt(L * L + C * C);
+      
+      const pt = { name: `${name}-${step}`, color: val, lon, lat, radius };
+      series.push(pt);
+      points.push(pt);
+    }
+
+    if (series.length >= 2) {
+      const stroke = series.find(p => p.name.endsWith('-500'))?.color ?? series[0].color;
+      allSeries.push({ series, stroke, type: 'tailwind' });
+    }
+  }
+}
+
+// Simple 색상 처리
+const simpleColors: Record<string, string> = {
+  black: '#000000',
+  white: '#ffffff',
+  red: '#ff0000',
+  green: '#00ff00',
+  blue: '#0000ff',
+};
+
+const simpleSeries: Point[] = [];
+
+for (const [name, color] of Object.entries(simpleColors)) {
+  const { H, C, L } = colorToHCL(color);
+  const lat = -90 + L * 180;
+  const lon = H;
+  const radius = Math.sqrt(L * L + C * C);
+
+  const pt = { name, color, lat, lon, radius };
+  simpleSeries.push(pt);
+  points.push(pt);
+}
+allSeries.push({ series: simpleSeries, stroke: '#ffffff', type: 'simple' });
+
+// 도시 좌표 추가
+for (const i in points) {
+  const cityPoints: Point[] = [
+    { name: 'North Pole', color: '#ffffff', lat: 90, lon: 0, radius: 1 },
+    { name: 'South Pole', color: '#ffffff', lat: -90, lon: 0, radius: 1 },
+    { name: 'Seoul', color: '#ffffff', lat: 37.5665, lon: 126.9780, radius: 1 },
+    { name: 'Tokyo', color: '#ffffff', lat: 35.6895, lon: 139.6917, radius: 1 },
+    { name: 'London', color: '#ffffff', lat: 51.5074, lon: -0.1278, radius: 1 },
+  ];
+  points.push(...cityPoints);
+  console.log(i, points[i].name, points[i])
+}
+
+let rotH = 0;
+let zoomScale = 1;
+let isDragging = false;
+let lastX = 0;
+const tilt = Math.PI * -45 / 180;
+const rightTilt = Math.PI * 23.5 / 180;
+
+function degToRad(deg: number) {
+  return deg * Math.PI / 180;
+}
+
+function projectLatLon(lat: number, lon: number, radius: number) {
+  const phi = degToRad(lon + rotH * 180 / Math.PI);
+  const theta = degToRad(90 - lat);
+  let x = radius * Math.sin(theta) * Math.cos(phi);
+  let z = radius * Math.sin(theta) * Math.sin(phi);
+  let y = radius * Math.cos(theta);
+
+  const cosT = Math.cos(tilt), sinT = Math.sin(tilt);
+  const ry = y * cosT - z * sinT;
+  const rz = y * sinT + z * cosT;
+  y = ry; z = rz;
+
+  const cosR = Math.cos(rightTilt), sinR = Math.sin(rightTilt);
+  const rx = x * cosR + z * sinR;
+  z = -x * sinR + z * cosR;
+  x = rx;
+
+  const scale = 200 * zoomScale;
+  return {
+    x: 400 + x * scale,
+    y: 300 - y * scale,
+    z,
+    scale: 0.8 + (0.5 - z) * 0.7,
+  };
+}
+
+onMounted(() => {
+  const ctx = canvas.value!.getContext('2d')!;
+  const draw = () => {
+    ctx.clearRect(0, 0, 800, 600);
+
+    // 위도/경도선
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    for (let t = 0; t <= 6; t++) {
+      const lat = 90 - t * 30;
+      ctx.beginPath();
+      for (let i = 0; i <= 72; i++) {
+        const lon = i * 5;
+        const p = projectLatLon(lat, lon, 1);
+        if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    for (let pIdx = 0; pIdx < 12; pIdx++) {
+      const lon = pIdx * 30;
+      ctx.beginPath();
+      for (let t = 0; t <= 50; t++) {
+        const lat = 90 - t * 3.6;
+        const p = projectLatLon(lat, lon, 1);
+        if (t === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+
+    // 시리즈 렌더링
+    const enabledTypes: string[] = [];
+    if (enabledTailwindColors.value) enabledTypes.push('tailwind');
+    if (enabledSimpleColors.value) enabledTypes.push('simple');
+
+    allSeries.forEach(({ series, stroke, type }) => {
+      if (!enabledTypes.includes(type)) return;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      series.forEach((p, i) => {
+        const proj = projectLatLon(p.lat, p.lon, p.radius);
+        if (i === 0) ctx.moveTo(proj.x, proj.y);
+        else ctx.lineTo(proj.x, proj.y);
+      });
+      ctx.stroke();
+    });
+
+    // 점 + 라벨 렌더링
+    const projectedPoints = points.map(p => ({
+      ...projectLatLon(p.lat, p.lon, p.radius),
+      p,
+      type: p.name.includes('-') ? 'tailwind' :
+        simpleColors[p.name] ? 'simple' : 'city',
+    })).sort((a, b) => a.z - b.z);
+
+    projectedPoints.forEach(({ x, y, scale, p, type }) => {
+      if (
+        (type === 'tailwind' && !enabledTailwindColors.value) ||
+        (type === 'simple' && !enabledSimpleColors.value) ||
+        (type === 'city' && !enabledCities.value)
+      ) return;
+
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(x, y, 4 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.font = `${8 * scale}px sans-serif`;
+      ctx.fillText(p.name, x + 6, y + 4);
+    });
+
+    requestAnimationFrame(draw);
+  };
+  draw();
+
+  container.value!.addEventListener('mousedown', e => {
+    isDragging = true;
+    lastX = e.clientX;
+  });
+  window.addEventListener('mouseup', () => isDragging = false);
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    rotH += (e.clientX - lastX) * 0.01;
+    lastX = e.clientX;
+  });
+  container.value!.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomScale *= e.deltaY > 0 ? 0.9 : 1.1;
+    zoomScale = Math.min(Math.max(zoomScale, 0.2), 5);
+  }, { passive: false });
+});
+</script>
+
+<style scoped>
+canvas {
+  background: black;
+}
+</style>

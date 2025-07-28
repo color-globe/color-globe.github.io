@@ -2,7 +2,7 @@
 import { onMounted, ref, watch, onBeforeUnmount } from 'vue'
 import Globe, { type GlobeInstance } from 'globe.gl'
 import { MeshLambertMaterial, DoubleSide } from 'three'
-import { getLandFeatures } from '@/data/land'
+import { getFeatures } from '@/data/landTopology'
 import { useClassDark } from '@/composables/useClassDark'
 import { Vector3, Line, BufferGeometry, LineBasicMaterial } from 'three'
 
@@ -70,20 +70,15 @@ onMounted(async () => {
     ])
 
   const controls = globeInstance.controls()
-  const camera = globeInstance.camera()
-
   controls.autoRotate = true
   controls.enableZoom = false
-
-  camera.position.set(0, 0, 400)
-  controls.update()
 
   resizeGlobe()
   window.addEventListener('resize', resizeGlobe)
 
-  const land = getLandFeatures()
+  const features = getFeatures()
   globeInstance
-    .polygonsData(land.features)
+    .polygonsData(features)
 
 
   drawRotationAxis()

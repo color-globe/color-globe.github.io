@@ -13,7 +13,15 @@ import { mdiGithub } from '@mdi/js'
             <img src="@/assets/logo.svg" alt="Logo" class="h-8 w-8" />
             <span>ColorGlobe</span>
           </RouterLink>
+          <RouterLink to="/oklab" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Oklab
+          </RouterLink>
+          <RouterLink to="/cylinder" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Cylinder
+          </RouterLink>
+          <RouterLink to="/bicone" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Bicone
+          </RouterLink>
           <RouterLink to="/globe" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Globe
+          </RouterLink>
+          <RouterLink to="/globe2" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Globe2
           </RouterLink>
           <RouterLink to="/docs" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Docs
           </RouterLink>
