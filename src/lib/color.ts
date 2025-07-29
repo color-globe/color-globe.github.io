@@ -1,9 +1,9 @@
 import Color from 'colorjs.io';
 
 export interface Geo {
-  lat: number; // 위도 (degree)
-  lon: number; // 경도 (degree)
-  alt: number; // 고도 = 반지름
+  lat: number; // 위도 (degree, -90-90)
+  lon: number; // 경도 (degree, 0-360)
+  alt: number; // 고도 = 반지름 (0-1)
 }
 
 export function colorToGeo(input: string): Geo {
