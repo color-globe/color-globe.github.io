@@ -1,11 +1,18 @@
+<!-- BaseIcon.vue -->
 <script setup lang="ts">
-const props = defineProps<{
+type Props = {
   path: string
-}>()
+  size?: number
+}
+
+withDefaults(defineProps<Props>(), {
+  size: 24,
+})
 </script>
 
 <template>
-  <svg class="fill-current" viewBox="0 0 24 24" aria-hidden="true" role="img">
-    <path :d="props.path" />
+  <svg :width="size" :height="size" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"
+    class="inline-block">
+    <path :d="path" />
   </svg>
 </template>

@@ -1,3 +1,4 @@
+<!-- ThemeSelector.vue -->
 <script setup lang="ts">
 import { useDark } from '@vueuse/core'
 import BaseIcon from './BaseIcon.vue'
