@@ -176,6 +176,8 @@ const centerLon = ref(0)
 const tiltLat = ref(23.5)
 const paused = ref(false)
 
+const POINT_RADIUS = 3.5
+
 function handlePause(v: boolean) { paused.value = v }
 
 const spinOptions = [
@@ -362,12 +364,9 @@ const CanvasPanel = defineComponent({
       return ((lon + 180) % 360 + 360) % 360 - 180
     }
 
-    function drawLabelAt(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string) {
+    function drawLabelAt(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
       ctx.beginPath()
-      ctx.fillStyle = color
-      ctx.arc(x, y, 4, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = isDark.value ? '#9998' : '#6668'
+      ctx.fillStyle = isDark.value ? '#aaa8' : '#6668'
       ctx.font = '12px monospace'
       ctx.textAlign = 'left'
       ctx.textBaseline = 'middle'
@@ -497,12 +496,12 @@ const CanvasPanel = defineComponent({
           ctx.beginPath()
           ctx.fillStyle = p.hex
           ctx.globalAlpha = 0.95
-          ctx.arc(px, py, props.mode === 'map' ? 2.0 : 2.6, 0, Math.PI * 2)
+          ctx.arc(px, py, POINT_RADIUS, 0, Math.PI * 2)
           ctx.fill()
           ctx.globalAlpha = 1
 
           const text = buildLabelText(p)
-          if (text) drawLabelAt(ctx, text, px, py, p.hex)
+          if (text) drawLabelAt(ctx, text, px, py)
         }
 
         return projection

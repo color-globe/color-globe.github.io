@@ -21,8 +21,7 @@ const MIN_ZOOM = 0.5
 const MAX_ZOOM = 8
 const ZOOM_STEP = 0.1
 
-const POINT_RADIUS = 5
-const TEXT_SIZE = 20
+const POINT_RADIUS = 4.5
 
 /* DOM / size */
 let containerEl: HTMLDivElement | null = null
@@ -122,8 +121,8 @@ function draw() {
     ctx.globalAlpha = 1
 
     // label
-    ctx.fillStyle = '#6668'
-    ctx.font = `${TEXT_SIZE}px monospace`
+    ctx.fillStyle = '#666'
+    ctx.font = '12px monospace'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
     ctx.fillText(p.name, px + POINT_RADIUS + 4, py)
@@ -151,16 +150,8 @@ function onMouseMove(e: MouseEvent) { if (!dragging) return; const dx = e.client
 function onMouseUp() { dragging = false; paused.value = false }
 
 function onWheel(e: WheelEvent) {
-  // prevent page scroll
   e.preventDefault()
-
-  // wheel: deltaY > 0 = zoom out, < 0 = zoom in
   const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
-
-  // optional smoothing for trackpads
-  // const scale = e.ctrlKey ? 0.25 : 1
-  // zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + delta * scale))
-
   zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + delta))
   invalidate()
 }
