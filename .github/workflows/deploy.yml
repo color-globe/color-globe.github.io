@@ -1,0 +1,53 @@
+name: Release on version bump
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write  # 태그/릴리스 생성
+
+jobs:
+  release-if-version-changed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read current version
+        id: pkg
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Find latest v* tag
+        id: last
+        run: |
+          last_tag=$(git tag -l 'v*' | sort -V | tail -n1 || true)
+          echo "last_tag=$last_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Decide
+        id: decide
+        run: |
+          curr="v${{ steps.pkg.outputs.version }}"
+          last="${{ steps.last.outputs.last_tag }}"
+          if [ -z "$last" ] || [ "$curr" != "$last" ]; then
+            echo "need_release=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$curr" >> "$GITHUB_OUTPUT"
+          else
+            echo "need_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tag
+        if: steps.decide.outputs.need_release == 'true'
+        run: |
+          git tag "${{ steps.decide.outputs.tag }}"
+          git push origin "${{ steps.decide.outputs.tag }}"
+
+      - name: Create GitHub Release
+        if: steps.decide.outputs.need_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.decide.outputs.tag }}
+          name: ${{ steps.decide.outputs.tag }}
+          generate_release_notes: true

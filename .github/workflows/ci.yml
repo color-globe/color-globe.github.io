@@ -3,44 +3,74 @@ name: CI
 on:
   pull_request:
     branches: [ main ]
-    paths-ignore:
-      - '**/*.md'
-      - '**/.gitignore'
-      - '.github/ISSUE_TEMPLATE/**'
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: pr-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  enforce-version-bump:
+    if: ${{ github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout (full)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Ensure package.json changed
+        run: |
+          set -e
+          git fetch origin ${{ github.base_ref }} --depth=1
+          # base 대비 변경 파일 목록
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "$CHANGED" | grep -qx "package.json" || {
+            echo "::error::This PR must update package.json version."
+            exit 1
+          }
+
+      - name: Compare version with base (semver)
+        id: compare
+        run: |
+          set -e
+          BASE_VERSION=$(git show origin/${{ github.base_ref }}:package.json | jq -r .version)
+          CURR_VERSION=$(jq -r .version package.json)
+
+          echo "Base: $BASE_VERSION"
+          echo "Curr: $CURR_VERSION"
+
+          # 간단한 semver 비교 (vX.Y.Z 형식 가정)
+          node - <<'NODE'
+          function parse(v){const m=String(v).match(/^(\d+)\.(\d+)\.(\d+)(?:-.+)?$/);if(!m)throw new Error(`Invalid semver: ${v}`);return m.slice(1,4).map(Number)}
+          const [base,curr] = [process.env.BASE_VERSION, process.env.CURR_VERSION];
+          const [b1,b2,b3] = parse(base), [c1,c2,c3] = parse(curr);
+          let gt = false;
+          if (c1>b1) gt=true; else if (c1===b1 && c2>b2) gt=true; else if (c1===b1 && c2===b2 && c3>b3) gt=true;
+          if (!gt) { console.error(`Current version (${curr}) must be greater than base (${base}).`); process.exit(1); }
+          NODE
+        env:
+          BASE_VERSION: ${{ steps.compare.outputs.base_version }}
+          CURR_VERSION: ${{ steps.compare.outputs.curr_version }}
+
+  build-and-test:
+    needs: enforce-version-bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm run --if-present lint
-
-      - name: Type Check
-        run: pnpm run --if-present typecheck
-
-      - name: Test
-        run: pnpm run --if-present test
-
-      - name: Build
-        run: pnpm run build
+      - run: pnpm run --if-present lint
+      - run: pnpm run --if-present typecheck
+      - run: pnpm run --if-present test
+      - run: pnpm run build
