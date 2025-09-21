@@ -3,24 +3,72 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   check-version:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      # Detect if package.json version was bumped
-      - id: vc
-        uses: EndBug/version-check@v2
         with:
-          diff-search: true  # Check the diff, not only commit message
+          fetch-depth: 1  # we fetch the base SHA explicitly below
 
-      # Fail if version was not bumped
-      - name: Fail if version not bumped
-        if: steps.vc.outputs.changed != 'true'
+      - name: Ensure package.json changed
+        shell: bash
         run: |
-          echo "::error::This PR must bump package.json version."
-          exit 1
+          set -euo pipefail
+          # Compare base SHA vs HEAD without relying on GitHub API
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          BASE_REPO='${{ github.event.pull_request.base.repo.clone_url }}'
+
+          # Fetch just the base commit object (works for forks)
+          git fetch --no-tags --depth=1 "$BASE_REPO" "$BASE_SHA"
+
+          # List changed files between base and HEAD
+          CHANGED=$(git diff --name-only FETCH_HEAD...HEAD || true)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          if ! echo "$CHANGED" | grep -qxF "package.json"; then
+            echo "::error::This PR must bump package.json version."
+            exit 1
+          fi
+
+      - name: Compare version (semver must increase)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          BASE_REPO='${{ github.event.pull_request.base.repo.clone_url }}'
+
+          # Reuse FETCH_HEAD from previous fetch; if step isolation concerns you, fetch again:
+          git fetch --no-tags --depth=1 "$BASE_REPO" "$BASE_SHA"
+
+          BASE_VERSION=$(git show FETCH_HEAD:package.json | jq -r .version)
+          CURR_VERSION=$(jq -r .version package.json)
+
+          echo "Base: $BASE_VERSION"
+          echo "Curr: $CURR_VERSION"
+
+          node - <<'NODE'
+          function parse(v){
+            const m=String(v).match(/^(\d+)\.(\d+)\.(\d+)(?:-.+)?$/);
+            if(!m) throw new Error(`Invalid semver: ${v}`);
+            return m.slice(1,4).map(Number);
+          }
+          const base = process.env.BASE_V;
+          const curr = process.env.CURR_V;
+          const [b1,b2,b3]=parse(base), [c1,c2,c3]=parse(curr);
+          const gt = (c1>b1) || (c1===b1 && c2>b2) || (c1===b1 && c2===b2 && c3>b3);
+          if (!gt) {
+            console.error(`Current version (${curr}) must be greater than base (${base}).`);
+            process.exit(1);
+          }
+          NODE
+        env:
+          BASE_V: ${{ steps.compare_versions.outputs.base_version }}
+          CURR_V: ${{ steps.compare_versions.outputs.curr_version }}
 
   build-and-test:
     needs: check-version
