@@ -1,0 +1,93 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # safe; we diff by SHA
+
+      # Ensure package.json changed somewhere in this PR (base SHA vs PR HEAD)
+      - name: Ensure package.json changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          BASE_REPO='${{ github.event.pull_request.base.repo.clone_url }}'
+          HEAD_SHA='${{ github.sha }}'
+
+          git fetch --no-tags --depth=1 "$BASE_REPO" "$BASE_SHA"
+
+          CHANGED="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)"
+          echo "Changed files:"
+          echo "${CHANGED}"
+
+          if ! echo "${CHANGED}" | grep -qxF "package.json"; then
+            echo "::error::This PR must bump package.json version."
+            exit 1
+          fi
+
+      # Compare versions: current must be strictly greater than base (semver)
+      - name: Compare version (semver must increase)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          BASE_REPO='${{ github.event.pull_request.base.repo.clone_url }}'
+
+          git fetch --no-tags --depth=1 "$BASE_REPO" "$BASE_SHA"
+
+          # Get versions (handle base without package.json)
+          if ! git cat-file -e "$BASE_SHA:package.json" 2>/dev/null; then
+            echo "package.json does not exist at base; treating as initial addition -> OK"
+            exit 0
+          fi
+
+          BASE_VERSION="$(git show "$BASE_SHA:package.json" | jq -r .version || true)"
+          CURR_VERSION="$(jq -r .version package.json)"
+
+          echo "Base: ${BASE_VERSION:-<none>}"
+          echo "Curr: ${CURR_VERSION}"
+
+          # Pass shell vars to Node via inline env (this was missing before)
+          BASE_V="${BASE_VERSION}" CURR_V="${CURR_VERSION}" node - <<'NODE'
+          function parse(v){
+            const m=String(v).match(/^(\d+)\.(\d+)\.(\d+)(?:-.+)?$/);
+            if(!m) throw new Error(`Invalid semver: ${v}`);
+            return m.slice(1,4).map(Number);
+          }
+          const base = process.env.BASE_V;
+          const curr = process.env.CURR_V;
+          const [b1,b2,b3] = parse(base);
+          const [c1,c2,c3] = parse(curr);
+          const gt = (c1>b1) || (c1===b1 && c2>b2) || (c1===b1 && c2===b2 && c3>b3);
+          if (!gt) {
+            console.error(`Current version (${curr}) must be greater than base (${base}).`);
+            process.exit(1);
+          }
+          NODE
+
+  build-and-test:
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run --if-present lint
+      - run: pnpm run --if-present typecheck
+      - run: pnpm run --if-present test
+      - run: pnpm run build
