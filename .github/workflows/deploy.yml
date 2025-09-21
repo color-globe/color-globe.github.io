@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: write  # 태그/릴리스 생성
+  contents: write
 
 jobs:
   release-if-version-changed:
