@@ -1,58 +1,29 @@
 name: CI
-
 on:
   pull_request:
-    branches: [ main ]
-    types: [opened, synchronize, reopened, ready_for_review]
-
-concurrency:
-  group: pr-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [main]
 
 jobs:
-  enforce-version-bump:
-    if: ${{ github.event.pull_request.draft == false }}
+  check-version:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (full)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      # Detect if package.json version was bumped
+      - id: vc
+        uses: EndBug/version-check@v2
         with:
-          fetch-depth: 0
+          diff-search: true  # Check the diff, not only commit message
 
-      - name: Ensure package.json changed
+      # Fail if version was not bumped
+      - name: Fail if version not bumped
+        if: steps.vc.outputs.changed != 'true'
         run: |
-          set -e
-          git fetch origin ${{ github.base_ref }} --depth=1
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
-          echo "$CHANGED" | grep -qx "package.json" || {
-            echo "::error::This PR must update package.json version."
-            exit 1
-          }
-
-      - name: Compare version with base (semver)
-        id: compare
-        run: |
-          set -e
-          BASE_VERSION=$(git show origin/${{ github.base_ref }}:package.json | jq -r .version)
-          CURR_VERSION=$(jq -r .version package.json)
-
-          echo "Base: $BASE_VERSION"
-          echo "Curr: $CURR_VERSION"
-
-          node - <<'NODE'
-          function parse(v){const m=String(v).match(/^(\d+)\.(\d+)\.(\d+)(?:-.+)?$/);if(!m)throw new Error(`Invalid semver: ${v}`);return m.slice(1,4).map(Number)}
-          const [base,curr] = [process.env.BASE_VERSION, process.env.CURR_VERSION];
-          const [b1,b2,b3] = parse(base), [c1,c2,c3] = parse(curr);
-          let gt = false;
-          if (c1>b1) gt=true; else if (c1===b1 && c2>b2) gt=true; else if (c1===b1 && c2===b2 && c3>b3) gt=true;
-          if (!gt) { console.error(`Current version (${curr}) must be greater than base (${base}).`); process.exit(1); }
-          NODE
-        env:
-          BASE_VERSION: ${{ steps.compare.outputs.base_version }}
-          CURR_VERSION: ${{ steps.compare.outputs.curr_version }}
+          echo "::error::This PR must bump package.json version."
+          exit 1
 
   build-and-test:
-    needs: enforce-version-bump
+    needs: check-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,7 +38,6 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-
       - run: pnpm run --if-present lint
       - run: pnpm run --if-present typecheck
       - run: pnpm run --if-present test
