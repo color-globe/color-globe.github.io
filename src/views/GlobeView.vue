@@ -1,504 +1,612 @@
+<!-- MultiView.vue -->
+<!-- eslint-disable vue/no-mutating-props -->
 <template>
-  <div class="flex">
-    <div>
-      <div class="mb-2 space-x-4">
-        <label><input type="checkbox" v-model="enabledSimpleColors" /> Show Simple Colors</label>
-        <label><input type="checkbox" v-model="enabledChromaTailwind" /> Show Tailwind Chroma</label>
-        <label><input type="checkbox" v-model="enabledGrayTailwind" /> Show Tailwind Gray</label>
-        <label><input type="checkbox" v-model="enabledCities" /> Show Cities</label>
-        <label><input type="checkbox" v-model="enabledGamutPoints" /> Show Gamut Points</label>
-        <label><input type="checkbox" v-model="showName" /> Show Name</label>
-        <label><input type="checkbox" v-model="showGeo" /> Show Geo</label>
+  <div class="flex flex-col">
+    <div class="flex items-start p-4 gap-4">
+      <div class="flex flex-col items-center w-[600px] gap-4">
+        <CanvasPanel title="Globe" mode="globe" :width="600" :height="600" :points="points" :checked-ids="checkedIds"
+          :group-index="groupIndex" :connect-tailwind-lines="connectTailwindLines" v-model:center-lon="centerLon"
+          v-model:tilt-lat="tiltLat" :paused="paused" @pause="handlePause" :show-name="showName"
+          :show-backside="showBacksideGlobe" />
+        <CanvasPanel title="Map" mode="map" :width="600" :height="300" :points="points" :checked-ids="checkedIds"
+          :group-index="groupIndex" :connect-tailwind-lines="connectTailwindLines" v-model:center-lon="centerLon"
+          :paused="paused" @pause="handlePause" :show-name="showName" />
       </div>
 
-      <div class="mb-1 font-bold">지구본</div>
-      <div ref="container" class="relative w-[800px] h-[600px] border mb-4">
-        <canvas ref="canvas" width="800" height="600" class="absolute top-0 left-0"></canvas>
+      <div class="flex flex-col gap-4">
+        <CanvasPanel title="Polar" mode="polar" :width="300" :height="300" :points="points" :checked-ids="checkedIds"
+          :group-index="groupIndex" :connect-tailwind-lines="connectTailwindLines" v-model:center-lon="centerLon"
+          :paused="paused" @pause="handlePause" :show-name="showName" />
+        <CanvasPanel title="Equator" mode="equator" :width="300" :height="300" :points="points"
+          :checked-ids="checkedIds" :group-index="groupIndex" :connect-tailwind-lines="connectTailwindLines"
+          v-model:center-lon="centerLon" :paused="paused" @pause="handlePause" :show-name="showName" />
       </div>
 
-      <div class="mb-1 font-bold">평면도</div>
-      <div class="relative w-[800px] h-[300px] border">
-        <canvas ref="canvas2" width="800" height="300" class="absolute top-0 left-0"></canvas>
-      </div>
-    </div>
+      <aside class="w-[320px] shrink-0">
+        <div class="sticky top-4 flex flex-col gap-4 max-h-[calc(100vh-2rem)] overflow-auto">
+          <!-- Objects -->
+          <div class="border rounded-xl p-3">
+            <div class="font-semibold mb-2">Objects</div>
 
-    <div class="flex flex-col ml-4">
-      <div class="mb-1 font-bold">극지도</div>
-      <div class="relative w-[400px] h-[400px] border mb-4">
-        <canvas ref="canvas3" width="400" height="400" class="absolute top-0 left-0"></canvas>
-      </div>
+            <!-- x11 colors -->
+            <label class="flex items-center gap-2 mb-2">
+              <input type="checkbox" v-model="toggles.x11">
+              <span>x11 colors</span>
+            </label>
 
-      <div class="mb-1 font-bold">정면도</div>
-      <div class="relative w-[400px] h-[400px] border">
-        <canvas ref="canvas4" width="400" height="400" class="absolute top-0 left-0"></canvas>
-      </div>
+            <!-- tailwind -->
+            <div class="mb-2">
+              <div class="text-sm opacity-70 mb-1">tailwind</div>
+              <label class="flex items-center gap-2 ml-4">
+                <input type="checkbox" v-model="toggles.tailwindChroma">
+                <span>chroma</span>
+              </label>
+              <label class="flex items-center gap-2 ml-4">
+                <input type="checkbox" v-model="toggles.tailwindGray">
+                <span>gray</span>
+              </label>
+              <label class="flex items-center gap-2 ml-4">
+                <input type="checkbox" v-model="toggles.tailwindLines">
+                <span>lines</span>
+              </label>
+            </div>
+
+            <!-- globe -->
+            <div>
+              <div class="text-sm opacity-70 mb-1">globe</div>
+              <label class="flex items-center gap-2 ml-4">
+                <input type="checkbox" v-model="toggles.places">
+                <span>places</span>
+              </label>
+              <label class="flex items-center gap-2 ml-4">
+                <input type="checkbox" v-model="toggles.land">
+                <span>land</span>
+              </label>
+              <label class="flex items-center gap-2 ml-4">
+                <input type="checkbox" v-model="toggles.graticuleAxis">
+                <span>graticule &amp; axis</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="border rounded-xl p-3">
+            <div class="font-semibold mb-2">Options</div>
+            <label class="flex items-center gap-2 mb-2">
+              <input type="checkbox" v-model="toggles.textName">
+              <span>show name</span>
+            </label>
+            <label class="flex items-center gap-2 mb-3">
+              <input type="checkbox" v-model="showBacksideGlobe">
+              <span>show backside objects</span>
+            </label>
+
+            <div class="flex items-center gap-2">
+              <span class="text-sm opacity-70">speed</span>
+              <select v-model="spinSpeed" class="border rounded px-2 py-1 bg-white dark:bg-black">
+                <option v-for="o in spinOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </aside>
     </div>
   </div>
 </template>
 
-
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
-import tailwindColors from 'tailwindcss/colors';
-import { type Geo, colorToGeo } from '@/lib/color';
+import { defineComponent, h, onMounted, onBeforeUnmount, ref, watch, computed, watchEffect, reactive } from 'vue'
+import { useMouse, useMousePressed, useDark } from '@vueuse/core'
+import { feature } from 'topojson-client'
+import worldAtlasLand from 'world-atlas/land-110m.json'
+import type { Topology } from 'topojson-specification'
+import type { FeatureCollection } from 'geojson'
+import { geoEquirectangular, geoGraticule, geoOrthographic, geoPath, type GeoProjection } from 'd3-geo'
 
-const canvas = ref<HTMLCanvasElement | null>(null);
-const canvas2 = ref<HTMLCanvasElement | null>(null);
-const canvas3 = ref<HTMLCanvasElement | null>(null);
-const canvas4 = ref<HTMLCanvasElement | null>(null);
-const container = ref<HTMLDivElement | null>(null);
+import { getPoints } from '@/lib/point'
+import type { Point, Geo } from '@/lib/point'
 
-const enabledSimpleColors = ref(true);
-const enabledChromaTailwind = ref(false);
-const enabledGrayTailwind = ref(true);
-const enabledCities = ref(true);
-const enabledGamutPoints = ref(false);
-const showName = ref(true);
-const showGeo = ref(false);
-
-
-type PointType = 'tailwind-chroma' | 'tailwind-gray' | 'simple' | 'city' | 'gamut';
-
-interface HSL {
-  H: number;
-  S: number;
-  L: number;
+/* -------------------------------
+   체크박스 상태 (TriStateTree 제거)
+---------------------------------*/
+type Toggles = {
+  // objects
+  x11: boolean
+  tailwindChroma: boolean
+  tailwindGray: boolean
+  tailwindLines: boolean
+  places: boolean
+  land: boolean
+  graticuleAxis: boolean
+  // options
+  textName: boolean
 }
 
-interface Point {
-  color: string;
-  name: string;
-  geo: Geo;
-  type: PointType;
+const toggles = reactive<Toggles>({
+  // objects
+  x11: true,
+  tailwindChroma: false,
+  tailwindGray: false,
+  tailwindLines: false,
+  places: false,
+  land: true,
+  graticuleAxis: true,
+  // options
+  textName: true,
+})
+
+// CanvasPanel이 쓰는 그룹키 매핑(변경 없음)
+const groupIndex = {
+  places: 'places',
+  tailwindChroma: 'tailwind.chroma',
+  tailwindGray: 'tailwind.gray',
+  x11: 'x11',
+  land: 'globe.land',
+  graticule: 'globe.graticule',
+  axis: 'globe.axis',
+} as const
+
+// 체크 → id 배열
+const checkedIds = computed<string[]>(() => {
+  const ids: string[] = []
+  if (toggles.x11) ids.push('x11')
+  if (toggles.tailwindChroma) ids.push('tailwind.chroma')
+  if (toggles.tailwindGray) ids.push('tailwind.gray')
+  if (toggles.places) ids.push('places')
+  if (toggles.land) ids.push('globe.land')
+  // graticule & axis 묶어서 제어
+  if (toggles.graticuleAxis) {
+    ids.push('globe.graticule', 'globe.axis')
+  }
+  // options: 라벨 표시만
+  if (toggles.textName) ids.push('text.name')
+  return ids
+})
+
+/** 선 연결 여부 / 라벨 표시 여부 */
+const connectTailwindLines = computed(() => toggles.tailwindLines)
+const showName = computed(() => toggles.textName)
+const showBacksideGlobe = ref(true)
+
+/* -------------------------------
+   데이터/공용 상태
+---------------------------------*/
+const points: Point[] = getPoints()
+const centerLon = ref(0)
+const tiltLat = ref(23.5)
+const paused = ref(false)
+
+function handlePause(v: boolean) { paused.value = v }
+
+const spinOptions = [
+  { label: '0°/s (stop)', value: 0 },
+  { label: '3°/s', value: 3 },
+  { label: '6°/s', value: 6 },
+  { label: '12°/s', value: 12 },
+  { label: '24°/s', value: 24 },
+  { label: '48°/s', value: 48 },
+] as const
+const spinSpeed = ref<number>(12)
+
+/* -------------------------------
+   rAF (부모 중앙 집중)
+---------------------------------*/
+const rafSubs = new Set<() => void>()
+function onRaf(cb: () => void) { rafSubs.add(cb); return () => rafSubs.delete(cb) }
+
+let rid: number | null = null
+let last = 0
+function tick(t: number) {
+  if (!last) last = t
+  const dt = t - last
+  last = t
+
+  if (!paused.value) {
+    centerLon.value = (centerLon.value + spinSpeed.value * (dt / 1000)) % 360
+  }
+
+  rafSubs.forEach(cb => cb())
+  rid = requestAnimationFrame(tick)
 }
+function start() { if (rid == null) rid = requestAnimationFrame(tick) }
+function stop() { if (rid != null) { cancelAnimationFrame(rid); rid = null; last = 0 } }
+onMounted(() => start())
+onBeforeUnmount(() => stop())
 
-const points: Point[] = [];
-const gamutPoints: Point[] = [];
+/* -------------------------------
+   CanvasPanel (selection 코드 제거)
+---------------------------------*/
+const CanvasPanel = defineComponent({
+  name: 'CanvasPanel',
+  props: {
+    mode: { type: String as () => 'globe' | 'map' | 'polar' | 'equator', required: true },
+    title: { type: String, default: '' },
+    centerLon: { type: Number, required: true },
+    tiltLat: { type: Number, default: 0 },
+    width: { type: Number, required: true },
+    height: { type: Number, required: true },
+    points: { type: Array as () => Point[], required: true },
+    checkedIds: { type: Array as () => string[], required: true },
+    groupIndex: { type: Object as () => Record<string, string>, required: true },
+    connectTailwindLines: { type: Boolean, default: false },
+    paused: { type: Boolean, default: false },
+    showName: { type: Boolean, default: true },
+    showBackside: { type: Boolean, default: false },
+  },
+  emits: ['update:centerLon', 'update:tiltLat', 'pause'],
+  setup(props, { emit }) {
+    const isDark = useDark()
+    watch(isDark, () => invalidate())
 
-function calcGeo(hsl: HSL): Geo {
-  const { H, S, L } = hsl;
-  const lat = (L - 0.5) * Math.PI;
-  const lon = (H % 360) * Math.PI / 180;
-  const alt = Math.cos(lat) * S;
-  return { lat, lon, alt };
-}
+    // DPR
+    const dpr = window.devicePixelRatio || 1
+    function ensureCanvasSize(c: HTMLCanvasElement, w: number, h: number) {
+      const W = Math.round(w * dpr), H = Math.round(h * dpr)
+      if (c.width !== W || c.height !== H) { c.width = W; c.height = H }
+      c.style.width = w + 'px'; c.style.height = h + 'px'
+    }
+    function withDpr(ctx: CanvasRenderingContext2D, fn: () => void) {
+      ctx.save(); ctx.scale(dpr, dpr); fn(); ctx.restore()
+    }
 
-function isChromaColor(name: string) {
-  const chromaList = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
-  return chromaList.includes(name);
-}
+    // draw scheduler
+    let needsRedraw = true
+    function invalidate() { needsRedraw = true }
+    function drawIfNeeded() {
+      if (!needsRedraw) return
+      needsRedraw = false
+      drawBaseLayerAndPoints()
+    }
 
-function addColor(name: string, color: string, type: PointType) {
-  const geo = colorToGeo(color);
-  points.push({ name, color, geo, type });
-}
+    const container = ref<HTMLDivElement | null>(null)
+    const baseCanvas = ref<HTMLCanvasElement | null>(null)
+    const { x, y } = useMouse({ target: container })
+    const { pressed } = useMousePressed({ target: container })
 
-for (const [name, colorObj] of Object.entries(tailwindColors)) {
-  if (typeof colorObj === 'object' && colorObj !== null) {
-    const isChroma = isChromaColor(name);
-    for (const step of ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950']) {
-      const val = colorObj[step as keyof typeof colorObj];
-      if (typeof val === 'string') {
-        addColor(`${name}-${step}`, val, isChroma ? 'tailwind-chroma' : 'tailwind-gray');
+    let startX = 0, startY = 0, startLon = 0, startTilt = 0, zoom = 0.8
+    const minZoom = 0.5, maxZoom = 8
+
+    const graticule = geoGraticule().step([30, 15])()
+    const landTopology = worldAtlasLand as unknown as Topology
+    const raw = feature(landTopology, landTopology.objects.land) as FeatureCollection
+    const landFeatures = raw.features
+
+    const enabled = computed(() => new Set(props.checkedIds))
+    const isVisible = (groupKey: string): boolean => {
+      const id = props.groupIndex[groupKey]
+      return id ? enabled.value.has(id) : false
+    }
+
+    type Series = { color: string; points: Point[] }
+
+    const tailwindSeries = computed<Record<string, Array<{ p: Point; step: number }>>>(() => {
+      const obj: Record<string, Array<{ p: Point; step: number }>> = {}
+      for (const p of props.points as Point[]) {
+        if (p.group !== 'tailwindGray' && p.group !== 'tailwindChroma') continue
+        const m = /^([^\s-]+)-(\d+)$/.exec(p.name)
+        if (!m) continue
+        const family = m[1]
+        const step = parseInt(m[2], 10)
+        if (!obj[family]) obj[family] = []
+        obj[family].push({ p, step })
+      }
+      for (const k of Object.keys(obj)) obj[k].sort((a, b) => a.step - b.step)
+      return obj
+    })
+
+    const tailwindSeriesBuilt = ref<Series[]>([])
+    watch([tailwindSeries, isDark], () => {
+      const seriesMap = tailwindSeries.value
+      const out: Series[] = []
+      for (const fam of Object.keys(seriesMap)) {
+        const arr = seriesMap[fam]
+        if (!arr.length) continue
+        const midHex =
+          arr.find(e => e.step === 500)?.p.hex
+          ?? arr[Math.floor(arr.length / 2)]?.p.hex
+          ?? (isDark.value ? '#aaa' : '#666')
+        out.push({ color: midHex, points: arr.map(e => e.p) })
+      }
+      tailwindSeriesBuilt.value = out
+    }, { immediate: true })
+
+    function buildAxisSeries(points: Point[]): Series[] {
+      const north = points.find(p => p.group === 'axis' && p.geo.lat > 0)
+      const south = points.find(p => p.group === 'axis' && p.geo.lat < 0)
+      if (!north || !south) return []
+      return [{ color: 'gray', points: [north, south] }]
+    }
+
+    function drawSeriesList(ctx: CanvasRenderingContext2D, projection: GeoProjection | null, seriesList: Series[]) {
+      for (const s of seriesList) {
+        ctx.strokeStyle = s.color
+        ctx.lineWidth = props.mode === 'map' ? 1 : 1.2
+        ctx.globalAlpha = 0.8
+
+        let started = false
+        let prevLonRot: number | null = null
+        let prevPx: number | null = null
+
+        ctx.beginPath()
+        for (const p of s.points) {
+          const xy = projectXY(p.geo, projection)
+          if (!xy) continue
+          const [px, py] = xy
+          const lonRot = rotatedLon(p.geo.lon)
+
+          if (!started) {
+            ctx.moveTo(px, py)
+            started = true
+          } else {
+            let crossSeam = false
+            if (props.mode === 'map' && prevLonRot !== null) {
+              const diffLon = wrapLonDiff(lonRot, prevLonRot)
+              if (diffLon > 179.5) crossSeam = true
+              if (!crossSeam && prevPx !== null) {
+                const diffPx = Math.abs(px - prevPx)
+                if (diffPx > props.width * 0.5) crossSeam = true
+              }
+            }
+            if (crossSeam) ctx.moveTo(px, py)
+            else ctx.lineTo(px, py)
+          }
+          prevLonRot = lonRot
+          prevPx = px
+        }
+        ctx.stroke()
+        ctx.globalAlpha = 1
       }
     }
-  }
-}
 
-const simpleColors: Record<string, string> = {
-  black: '#000000',
-  white: '#ffffff',
-  red: '#ff0000',
-  green: '#00ff00',
-  blue: '#0000ff',
-};
-for (const [name, val] of Object.entries(simpleColors)) {
-  addColor(name, val, 'simple');
-}
-
-const cityPoints = [
-  { name: 'North Pole', lat: 90, lon: 0 },
-  { name: 'South Pole', lat: -90, lon: 0 },
-  { name: 'Seoul', lat: 37.5665, lon: 126.9780 },
-  { name: 'Tokyo', lat: 35.6895, lon: 139.6917 },
-  { name: 'London', lat: 51.5074, lon: -0.1278 },
-];
-cityPoints.forEach(({ name, lat, lon }) => {
-  const HSL = latLonToOkhsl(lat, lon);
-  const color = `okhsl(${HSL.H} ${HSL.S} ${HSL.L})`;
-  const geo = calcGeo(HSL);
-  points.push({ name, color, geo, type: 'city' });
-});
-
-for (let l = 0; l <= 1.00001; l += 0.05) {
-  for (let h = 0; h < 360; h += 10) {
-    const S = 1;
-    const HSL = { H: h, S, L: l };
-    const color = `okhsl(${h} ${S} ${l})`;
-    const geo = calcGeo(HSL);
-    gamutPoints.push({
-      name: `(${h.toFixed(0)},${l.toFixed(1)})`,
-      color,
-      geo,
-      type: 'gamut',
-    });
-  }
-}
-
-let zoom = 1;
-const offsetY = 0;
-const tilt = 0;
-let axisTilt = 23.5 * Math.PI / 180; // 초기값: 23.5도
-let hueOffset = 0;
-let isDragging = false;
-let lastX = 0, lastY = 0;
-
-function projectSpherical3D(geo: Geo) {
-  const { lat, lon, alt: r } = geo;
-
-  const adjLon = lon + hueOffset * Math.PI / 180;
-
-  const scale = 250;
-  const centerX = 400;
-  const centerY = 300;
-
-  let x = r * Math.sin(adjLon);
-  let y = -Math.sin(lat); // 밝을수록 위
-  let z = r * Math.cos(adjLon);
-
-  const x0 = x;
-  const y0 = y;
-
-  const x2 = x0 * Math.cos(tilt) - y0 * Math.sin(tilt);
-  const y2 = x0 * Math.sin(tilt) + y0 * Math.cos(tilt);
-  x = x2;
-  y = y2;
-
-  // 회전 1: XZ 평면 (지구 측면 기울기)
-  const theta = Math.PI / 6;
-  const x1 = x * Math.cos(theta) + z * Math.sin(theta);
-  const z1 = -x * Math.sin(theta) + z * Math.cos(theta);
-  x = x1;
-  z = z1;
-
-  // 회전 2: YZ 평면 (지구축 기울기)
-  const phi = axisTilt;
-  const y1 = y * Math.cos(phi) + z * Math.sin(phi);
-  const z2 = -y * Math.sin(phi) + z * Math.cos(phi);
-  y = y1;
-  z = z2;
-
-  const depthScale = 1 / (1 + Math.max(z, 0.01));
-  const finalScale = 0.5 + depthScale * 0.5;
-
-  return {
-    x: centerX + x * scale * zoom,
-    y: centerY + y * scale * zoom + offsetY,
-    z,
-    scale: finalScale,
-  };
-}
-
-function projectFlat(geo: Geo) {
-  const H = (geo.lon * 180 / Math.PI + hueOffset) % 360;
-  const L = geo.lat / Math.PI + 0.5;
-
-  const x = (H / 360) * 800;
-  const y = (1 - L) * 300;
-  return { x, y };
-}
-
-function projectPolar(geo: Geo) {
-  const H = (geo.lon * 180 / Math.PI + hueOffset) % 360;
-
-  const cx = 200;
-  const cy = 200;
-  const maxR = 180;
-  const r = geo.alt * maxR;  // ✅ 채도 기반 반지름
-
-  const rad = H * Math.PI / 180;
-  return {
-    x: cx + r * Math.cos(rad),
-    y: cy + r * Math.sin(rad),
-  };
-}
-
-function projectFront(geo: Geo) {
-  const { lat, lon, alt } = geo;
-
-  const r = alt * 180;
-  const cx = 200;
-  const cy = 200;
-
-  const adjustedLon = lon + hueOffset * Math.PI / 180;
-
-  const x = cx + r * Math.sin(adjustedLon);
-  const y = cy - r * Math.sin(lat);
-
-  return { x, y };
-}
-
-function render(ctx: CanvasRenderingContext2D) {
-  ctx.clearRect(0, 0, 800, 600);
-
-  // 위도선 (L 기준)
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 1;
-  for (let latDeg = -80; latDeg <= 80; latDeg += 20) {
-    const lat = (latDeg / 180) * Math.PI;
-    const path = [];
-    for (let h = 0; h <= 360; h += 5) {
-      const lon = (h * Math.PI) / 180;
-      const S = 1;
-      // const L = lat / Math.PI + 0.5;
-      const geo: Geo = {
-        lat,
-        lon: lon + hueOffset * Math.PI / 180,
-        alt: Math.cos(lat) * S
-      };
-      const proj = projectSpherical3D(geo);
-      path.push({ x: proj.x, y: proj.y });
+    function wrapLon(lon: number): number {
+      return ((lon + 180) % 360 + 360) % 360 - 180
     }
-    ctx.beginPath();
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-    ctx.stroke();
-  }
 
-  // 경도선 (H 기준)
-  for (let h = 0; h < 360; h += 30) {
-    const lon = (h * Math.PI) / 180;
-    const path = [];
-    for (let l = 0.01; l < 1; l += 0.02) {
-      const lat = (l - 0.5) * Math.PI;
-      const S = 1;
-      const geo: Geo = {
-        lat,
-        lon: lon + hueOffset * Math.PI / 180,
-        alt: Math.cos(lat) * S
-      };
-      const proj = projectSpherical3D(geo);
-      path.push({ x: proj.x, y: proj.y });
+    function drawLabelAt(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string) {
+      ctx.beginPath()
+      ctx.fillStyle = color
+      ctx.arc(x, y, 4, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = isDark.value ? '#9998' : '#6668'
+      ctx.font = '12px monospace'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(text, x + 6, y)
     }
-    ctx.beginPath();
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-    ctx.stroke();
-  }
 
-  // 포인트 렌더링 (깊이 정렬)
-  const projected = getAllVisiblePoints()
-    .map(p => ({ ...projectSpherical3D(p.geo), p }))
-    .sort((a, b) => a.z - b.z); // z 깊이순 정렬
+    // 수동 오소그래픽 (tilt/zoom 일관 적용)
+    function geoToXY(geo: Geo): [number, number] | null {
+      const { lat, lon, r } = geo
+      const latRad = (lat * Math.PI) / 180
+      const lonRad = (lon * Math.PI) / 180
 
-  for (const { x, y, scale, p } of projected) {
-    renderPoint(ctx, x, y, p, 4 * scale, 10 * scale);
-  }
-}
+      let x3 = r * Math.cos(latRad) * Math.sin(lonRad)
+      let y3 = r * Math.sin(latRad)
+      let z3 = r * Math.cos(latRad) * Math.cos(lonRad)
 
-function renderFlat(ctx: CanvasRenderingContext2D) {
-  ctx.clearRect(0, 0, 800, 300);
+      const centerRad = (props.centerLon * Math.PI) / 180
+      {
+        const x1 = x3 * Math.cos(centerRad) + z3 * Math.sin(centerRad)
+        const z1 = -x3 * Math.sin(centerRad) + z3 * Math.cos(centerRad)
+        x3 = x1; z3 = z1
+      }
 
-  // H 축 그리드 (세로선)
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  ctx.lineWidth = 1;
-  for (let h = 0; h <= 360; h += 30) {
-    const x = ((h + hueOffset) % 360) / 360 * 800;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, 300);
-    ctx.stroke();
-  }
+      const tiltLat = props.mode === 'globe'
+        ? props.tiltLat
+        : props.mode === 'polar'
+          ? 90
+          : 0
+      const tiltRad = (tiltLat * Math.PI) / 180
+      {
+        const y1 = y3 * Math.cos(tiltRad) - z3 * Math.sin(tiltRad)
+        const z1 = y3 * Math.sin(tiltRad) + z3 * Math.cos(tiltRad)
+        y3 = y1; z3 = z1
+      }
 
-  // L 축 그리드 (가로선)
-  for (let l = 0; l <= 1.001; l += 0.1) {
-    const y = (1 - l) * 300;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(800, y);
-    ctx.stroke();
-  }
+      if (props.mode === 'globe') {
+        if (!props.showBackside && z3 <= 0) return null
+      }
 
-  // 점들 렌더링
-  for (const p of getAllVisiblePoints()) {
-    const { x, y } = projectFlat(p.geo);
-    renderPoint(ctx, x, y, p);
-  }
-}
-
-function renderPolar(ctx: CanvasRenderingContext2D) {
-  ctx.clearRect(0, 0, 400, 400);
-
-  // H 축 방사선
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  ctx.lineWidth = 1;
-  for (let h = 0; h < 360; h += 30) {
-    const rad = h * Math.PI / 180;
-    ctx.beginPath();
-    ctx.moveTo(200, 200);
-    ctx.lineTo(200 + 180 * Math.cos(rad), 200 + 180 * Math.sin(rad));
-    ctx.stroke();
-  }
-
-  // S 축 원형 가이드
-  for (let s = 0.1; s <= 1.001; s += 0.2) {
-    ctx.beginPath();
-    ctx.arc(200, 200, s * 180, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  // 점 그리기
-  for (const p of getAllVisiblePoints()) {
-    const { x, y } = projectPolar(p.geo); // 🔄 변경
-    renderPoint(ctx, x, y, p);
-  }
-}
-
-function renderFront(ctx: CanvasRenderingContext2D) {
-  ctx.clearRect(0, 0, 400, 400);
-
-  const cx = 200;
-  const cy = 200;
-  const maxR = 180;
-
-  // ⚪️ 원형 경계선
-  ctx.beginPath();
-  ctx.arc(cx, cy, maxR, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // 🌀 위도선 (수평)
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-  for (let latDeg = -60; latDeg <= 60; latDeg += 30) {
-    const lat = (latDeg / 180) * Math.PI;
-    const y = cy - Math.sin(lat) * maxR;
-
-    ctx.beginPath();
-    ctx.moveTo(cx - maxR, y);
-    ctx.lineTo(cx + maxR, y);
-    ctx.stroke();
-  }
-
-  // 🌀 경도선 (수직)
-  for (let lonDeg = -150; lonDeg <= 150; lonDeg += 30) {
-    const lon = (lonDeg / 180) * Math.PI;
-    const x = cx + Math.sin(lon) * maxR;
-
-    ctx.beginPath();
-    ctx.moveTo(x, cy - maxR);
-    ctx.lineTo(x, cy + maxR);
-    ctx.stroke();
-  }
-
-  // 🌈 점 그리기
-  for (const p of getAllVisiblePoints()) {
-    const { x, y } = projectFront(p.geo);  // ← 새 투영 함수
-    renderPoint(ctx, x, y, p);
-  }
-}
-
-function latLonToOkhsl(lat: number, lon: number): HSL {
-  const L = (lat + 90) / 180;
-  const H = (lon + 360) % 360;
-  const Seff = 1 - 4 * (L - 0.5) ** 2;
-  const S = Math.min(1, Math.max(0, Seff));
-  return { L, S, H };
-}
-
-function getAllVisiblePoints(): Point[] {
-  return [...points, ...(enabledGamutPoints.value ? gamutPoints : [])].filter(shouldShowPoint);
-}
-
-function shouldShowPoint(p: Point): boolean {
-  return !(
-    (p.type === 'tailwind-chroma' && !enabledChromaTailwind.value) ||
-    (p.type === 'tailwind-gray' && !enabledGrayTailwind.value) ||
-    (p.type === 'simple' && !enabledSimpleColors.value) ||
-    (p.type === 'city' && !enabledCities.value) ||
-    (p.type === 'gamut' && !enabledGamutPoints.value)
-  );
-}
-
-function renderPoint(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  p: Point,
-  radius = 4,
-  fontSize = 10
-) {
-  ctx.fillStyle = p.color;
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  const labels: string[] = [];
-
-  if (showName.value) labels.push(p.name);
-
-  if (showGeo.value) {
-    const { lat, lon, alt } = p.geo;
-    const geoText = `(${lat.toFixed(0)}° ${lon.toFixed(0)}° ${Math.round(100 * alt)}%)`;
-    labels.push(geoText);
-  }
-
-  if (labels.length > 0) {
-    ctx.fillStyle = 'white';
-    ctx.font = `${fontSize}px sans-serif`;
-    ctx.fillText(labels.join(''), x + radius + 2, y + fontSize / 2);
-  }
-}
-
-onMounted(() => {
-  const ctx = canvas.value!.getContext('2d')!;
-  const ctx2 = canvas2.value!.getContext('2d')!;
-  const ctx3 = canvas3.value!.getContext('2d')!;
-  const ctx4 = canvas4.value!.getContext('2d')!;
-
-  const rerender = () => {
-    render(ctx);
-    renderFlat(ctx2);
-    renderPolar(ctx3);
-    renderFront(ctx4);
-  };
-  rerender();
-
-  // 🌀 자동 회전
-  setInterval(() => {
-    if (!isDragging) {
-      hueOffset = (hueOffset + 0.3) % 360;
-      rerender();
+      const minSide = Math.min(props.width, props.height)
+      const scale = (minSide / 600) * 280 * (props.mode === 'globe' ? zoom : 1)
+      const cx = props.width / 2, cy = props.height / 2
+      return [cx + x3 * scale, cy - y3 * scale]
     }
-  }, 50); // 50ms마다 0.3도 회전 → 약 6초에 1바퀴
 
-  container.value!.addEventListener('mousedown', e => {
-    isDragging = true;
-    lastX = e.clientX;
-    lastY = e.clientY;
-  });
-  window.addEventListener('mouseup', () => isDragging = false);
-  window.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    hueOffset -= dx * 0.5;
-    axisTilt += dy * 0.005;
-    axisTilt = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, axisTilt)); // 제한: ±90도
+    function baseScale() { return (Math.min(props.width, props.height) / 600) * 280 }
 
-    lastX = e.clientX;
-    lastY = e.clientY;
-    rerender();
-  });
-  container.value!.addEventListener('wheel', e => {
-    e.preventDefault();
-    zoom *= e.deltaY > 0 ? 0.9 : 1.1;
-    zoom = Math.max(0.2, Math.min(zoom, 5));
-    rerender();
-  }, { passive: false });
+    function getProjectionForLand(): GeoProjection {
+      if (props.mode === 'globe') {
+        return geoOrthographic()
+          .rotate([props.centerLon, -props.tiltLat, 0])
+          .translate([props.width / 2, props.height / 2])
+          .scale(baseScale() * zoom)
+          .clipAngle(90)
+      }
+      const isMap = props.mode === 'map'
+      const rotate: [number, number, number] = props.mode === 'polar'
+        ? [props.centerLon, -90, 0]
+        : [props.centerLon, 0, 0]
+      const proj = isMap ? geoEquirectangular() : geoOrthographic()
+      return proj
+        .rotate(rotate)
+        .translate([props.width / 2, props.height / 2])
+        .scale(isMap ? 95 : 140)
+    }
 
-  [enabledSimpleColors, enabledChromaTailwind, enabledGrayTailwind, enabledCities, enabledGamutPoints].forEach(flag => {
-    watch(flag, rerender);
-  });
-});
+    function buildLabelText(p: Point) {
+      const parts: string[] = []
+      if (props.showName) parts.push(p.name)
+      return parts.join(' · ')
+    }
+
+    function drawBaseLayerAndPoints() {
+      const canvas = baseCanvas.value; if (!canvas) return null
+      ensureCanvasSize(canvas, props.width, props.height)
+      const ctx = canvas.getContext('2d'); if (!ctx) return null
+
+      return withDpr(ctx, () => {
+        const projection = getProjectionForLand()
+        const path = geoPath(projection, ctx as unknown as CanvasRenderingContext2D)
+
+        ctx.clearRect(0, 0, props.width, props.height)
+
+        const landFill = isDark.value ? '#9996' : '#9996'
+        const gridStroke = isDark.value ? '#9996' : '#9996'
+
+        if (isVisible('land')) {
+          ctx.fillStyle = landFill
+          ctx.beginPath()
+          path({ type: 'FeatureCollection', features: landFeatures })
+          ctx.fill()
+        }
+        if (isVisible('graticule')) {
+          ctx.strokeStyle = gridStroke
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          path(graticule)
+          ctx.stroke()
+        }
+
+        if (isVisible('axis')) {
+          const axisSeries = buildAxisSeries(props.points)
+          drawSeriesList(ctx, projection, axisSeries)
+        }
+
+        if (props.connectTailwindLines) {
+          const tailwindVisible = isVisible('tailwindGray') || isVisible('tailwindChroma')
+          if (tailwindVisible) {
+            const visibleGroups = new Set<string>()
+            if (isVisible('tailwindGray')) visibleGroups.add('tailwindGray')
+            if (isVisible('tailwindChroma')) visibleGroups.add('tailwindChroma')
+
+            const filtered = tailwindSeriesBuilt.value
+              .map(s => ({ ...s, points: s.points.filter(p => visibleGroups.has(p.group)) }))
+              .filter(s => s.points.length >= 2)
+
+            drawSeriesList(ctx, projection, filtered)
+          }
+        }
+
+        for (const p of props.points) {
+          if (!isVisible(p.group)) continue
+          const xy = projectXY(p.geo, projection)
+          if (!xy) continue
+          const [px, py] = xy
+
+          ctx.beginPath()
+          ctx.fillStyle = p.hex
+          ctx.globalAlpha = 0.95
+          ctx.arc(px, py, props.mode === 'map' ? 2.0 : 2.6, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.globalAlpha = 1
+
+          const text = buildLabelText(p)
+          if (text) drawLabelAt(ctx, text, px, py, p.hex)
+        }
+
+        return projection
+      })
+    }
+
+    function projectXY(geo: Geo, projection: GeoProjection | null): [number, number] | null {
+      if (props.mode === 'map') {
+        const lat2 = Math.asin(geo.r * Math.sin((geo.lat * Math.PI) / 180)) * 180 / Math.PI
+        const p = (projection as GeoProjection)([geo.lon, lat2])
+        return p ? [p[0], p[1]] as [number, number] : null
+      } else {
+        return geoToXY(geo)
+      }
+    }
+
+    function wrapLonDiff(a: number, b: number) {
+      return Math.abs((((a - b) + 180) % 360 + 360) % 360 - 180)
+    }
+    const rotatedLon = (lon: number) => (((lon - props.centerLon) + 180) % 360 + 360) % 360 - 180
+
+    // Interaction
+    watch(pressed, (v) => emit('pause', v))
+    function onMouseDown() {
+      startX = x.value; startY = y.value
+      startLon = props.centerLon; startTilt = props.tiltLat
+    }
+
+    watchEffect(() => {
+      if (!pressed.value) return
+      const dx = x.value - startX
+      const dy = y.value - startY
+      const deltaLon = dx * 0.5
+      emit('update:centerLon', wrapLon(startLon + deltaLon))
+      if (props.mode === 'globe') {
+        const deltaTilt = dy * 0.5
+        const nextTilt = Math.max(-90, Math.min(90, startTilt + deltaTilt))
+        emit('update:tiltLat', nextTilt)
+      }
+    })
+
+    function onWheel(e: WheelEvent) {
+      if (props.mode !== 'globe') return
+      e.preventDefault()
+      const delta = e.deltaY > 0 ? -0.1 : 0.1
+      zoom = Math.max(minZoom, Math.min(maxZoom, zoom + delta))
+      invalidate()
+    }
+    function onWindowMouseUp() { emit('pause', false) }
+    let offRaf: (() => void) | null = null
+
+    onMounted(() => {
+      container.value?.addEventListener('mousedown', onMouseDown)
+      container.value?.addEventListener('wheel', onWheel, { passive: false })
+      window.addEventListener('mouseup', onWindowMouseUp)
+      offRaf = onRaf(drawIfNeeded)
+      invalidate()
+    })
+    onBeforeUnmount(() => {
+      container.value?.removeEventListener('mousedown', onMouseDown)
+      container.value?.removeEventListener('wheel', onWheel)
+      window.removeEventListener('mouseup', onWindowMouseUp)
+      offRaf?.()
+    })
+
+    watch(
+      () => [
+        props.checkedIds,
+        props.centerLon,
+        props.tiltLat,
+        props.mode,
+        props.width,
+        props.height,
+        props.connectTailwindLines,
+        props.showName,
+        isDark.value,
+      ],
+      () => invalidate(),
+      { deep: true }
+    )
+
+    return () => h('div', { class: 'inline-block' }, [
+      h('div', {
+        ref: container,
+        class: 'border relative bg-white dark:bg-black rounded',
+        style: { width: props.width + 'px', height: props.height + 'px' }
+      }, [
+        props.title ? h('div', {
+          class: 'absolute top-1 right-2 font-bold text-sm bg-white/70 dark:bg-black/50 px-1 rounded'
+        }, props.title) : null,
+        h('canvas', {
+          ref: baseCanvas, width: props.width, height: props.height,
+          style: { position: 'absolute', inset: 0 }
+        }),
+      ])
+    ])
+  }
+})
+
+defineExpose({ CanvasPanel })
 </script>
+
+<style scoped>
+canvas {
+  display: block;
+}
+</style>
