@@ -1,0 +1,107 @@
+# release-and-pages.yml
+name: Release & Pages
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write   # needed for creating release/tag and pushing to gh-pages
+
+concurrency:
+  group: release-pages-on-main
+  cancel-in-progress: true
+
+jobs:
+  build_test_release_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 0) Build & test on the merge commit
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run --if-present lint
+      - run: pnpm run --if-present typecheck
+      - run: pnpm run --if-present test
+      - run: pnpm run --if-present build
+
+      # 1) Detect whether package.json has changed
+      - name: Detect package.json change
+        id: changed
+        run: |
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+          if git diff --name-only "$BEFORE" "$AFTER" | grep -qxF "package.json"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 2) Read version from package.json
+      - name: Read version
+        if: steps.changed.outputs.changed == 'true'
+        id: ver
+        run: |
+          VER="$(jq -r .version package.json)"
+          [[ "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$ ]] || { echo "::error::Invalid semver in package.json: $VER"; exit 1; }
+          echo "semver=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VER" >> "$GITHUB_OUTPUT"
+
+      # 3) Create release (if it does not already exist)
+      - name: Create release if needed
+        if: steps.changed.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Skipping."
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes --latest
+          fi
+
+      # 4) Re-checkout the tag to ensure deployment matches release
+      - name: Checkout tag ref for deploy
+        if: steps.changed.outputs.changed == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ver.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Setup Node for deploy build
+        if: steps.changed.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # 5) Build again at the release tag
+      - name: Install & Build (tag)
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build   # output: dist/
+
+      # 6) Add 404.html for SPA with history router
+      - name: Add SPA 404 fallback (History router)
+        if: steps.changed.outputs.changed == 'true'
+        run: cp dist/index.html dist/404.html || true
+
+      # 7) Deploy to gh-pages branch
+      - name: Deploy to gh-pages
+        if: steps.changed.outputs.changed == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          force_orphan: true

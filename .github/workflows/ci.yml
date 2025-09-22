@@ -1,82 +1,33 @@
+# ci.yml
 name: CI
+
 on:
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 permissions:
   contents: read
 
+concurrency:
+  group: pr-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check-version:
-    runs-on: ubuntu-latest
-    steps:
-      # Quick succeed for Dependabot (job stays "success", not "skipped")
-      - name: Fast-pass for Dependabot PRs
-        if: ${{ startsWith(github.head_ref, 'dependabot/') || github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]' }}
-        run: echo "Dependabot PR detected -> version bump not required."
-
-      - uses: actions/checkout@v4
-        if: ${{ ! (startsWith(github.head_ref, 'dependabot/') || github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
-        with:
-          fetch-depth: 0  # full history so we can safely diff by SHA
-
-      - name: Ensure package.json changed
-        if: ${{ ! (startsWith(github.head_ref, 'dependabot/') || github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          BASE_SHA='${{ github.event.pull_request.base.sha }}'
-          BASE_REPO='${{ github.event.pull_request.base.repo.clone_url }}'
-          HEAD_SHA='${{ github.sha }}'
-          git fetch --no-tags --depth=1 "$BASE_REPO" "$BASE_SHA"
-          CHANGED="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)"
-          echo "Changed files:"; echo "${CHANGED}"
-          if ! echo "${CHANGED}" | grep -qxF "package.json"; then
-            echo "::error::This PR must bump package.json version."
-            exit 1
-          fi
-
-      - name: Compare version (semver must increase)
-        if: ${{ ! (startsWith(github.head_ref, 'dependabot/') || github.actor == 'dependabot[bot]' || github.event.pull_request.user.login == 'dependabot[bot]') }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          BASE_SHA='${{ github.event.pull_request.base.sha }}'
-          BASE_REPO='${{ github.event.pull_request.base.repo.clone_url }}'
-          git fetch --no-tags --depth=1 "$BASE_REPO" "$BASE_SHA"
-          if ! git cat-file -e "$BASE_SHA:package.json" 2>/dev/null; then
-            echo "package.json does not exist at base; initial addition -> OK"
-            exit 0
-          fi
-          BASE_VERSION="$(git show "$BASE_SHA:package.json" | jq -r .version || true)"
-          CURR_VERSION="$(jq -r .version package.json)"
-          echo "Base: ${BASE_VERSION:-<none>}"; echo "Curr: ${CURR_VERSION}"
-          BASE_V="${BASE_VERSION}" CURR_V="${CURR_VERSION}" node - <<'NODE'
-          function parse(v){
-            const m=String(v).match(/^(\d+)\.(\d+)\.(\d+)(?:-.+)?$/);
-            if(!m) throw new Error(`Invalid semver: ${v}`);
-            return m.slice(1,4).map(Number);
-          }
-          const base = process.env.BASE_V, curr = process.env.CURR_V;
-          const [b1,b2,b3] = parse(base), [c1,c2,c3] = parse(curr);
-          const gt = (c1>b1) || (c1===b1 && c2>b2) || (c1===b1 && c2===b2 && c3>b3);
-          if (!gt) { console.error(`Current version (${curr}) must be greater than base (${base}).`); process.exit(1); }
-          NODE
-
   build-and-test:
-    needs: check-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        with: { version: 10 }
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
       - run: pnpm run --if-present lint
       - run: pnpm run --if-present typecheck
       - run: pnpm run --if-present test
-      - run: pnpm run build
+      - run: pnpm run --if-present build
