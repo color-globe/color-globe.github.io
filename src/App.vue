@@ -1,7 +1,12 @@
+<!-- App.vue -->
 <script setup lang="ts">
 import BaseIcon from '@/components/BaseIcon.vue'
 import ThemeSelector from '@/components/ThemeSelector.vue'
 import { mdiGithub } from '@mdi/js'
+
+const appVersion = __APP_VERSION__
+const buildTime = __BUILD_TIME__
+const isDev = __BUILD_ENV__ === 'development'
 </script>
 
 <template>
@@ -32,6 +37,10 @@ import { mdiGithub } from '@mdi/js'
 
     <footer class="bg-gray-100 dark:bg-gray-800 text-center py-4 text-gray-500 text-sm">
       Color Globe
+      <span>{{ appVersion }}</span>
+      <span v-if="isDev" class="ml-1">(dev)</span>
+      <span class="mx-1">·</span>
+      <span>{{ buildTime }}</span>
     </footer>
   </div>
 </template>

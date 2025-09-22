@@ -16,11 +16,7 @@ const centerLon = ref(0)
 const tiltLat = ref(23.5)
 const paused = ref(false)
 const showBackside = false
-let zoom = 0.75
-const MIN_ZOOM = 0.5
-const MAX_ZOOM = 8
-const ZOOM_STEP = 0.1
-
+const zoom = 1
 const POINT_RADIUS = 4.5
 
 /* DOM / size */
@@ -149,13 +145,6 @@ function onMouseDown(e: MouseEvent) { dragging = true; paused.value = true; star
 function onMouseMove(e: MouseEvent) { if (!dragging) return; const dx = e.clientX - startX, dy = e.clientY - startY; centerLon.value = wrapLon(startLon + dx * 0.5); tiltLat.value = clamp(-90, 90, startTilt + dy * 0.5); invalidate() }
 function onMouseUp() { dragging = false; paused.value = false }
 
-function onWheel(e: WheelEvent) {
-  e.preventDefault()
-  const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
-  zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + delta))
-  invalidate()
-}
-
 /* mount */
 onMounted(() => {
   containerEl = document.getElementById('globe-container') as HTMLDivElement
@@ -168,9 +157,6 @@ onMounted(() => {
   containerEl?.addEventListener('mousedown', onMouseDown)
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
-  if (containerEl) {
-    containerEl.addEventListener('wheel', onWheel, { passive: false })
-  }
   requestAnimationFrame(tick)
   invalidate()
 })
@@ -179,16 +165,13 @@ onBeforeUnmount(() => {
   containerEl?.removeEventListener('mousedown', onMouseDown)
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
-  if (containerEl) {
-    containerEl.removeEventListener('wheel', onWheel)
-  }
   if (rid != null) cancelAnimationFrame(rid)
 })
 </script>
 
 <template>
   <div class="p-4">
-    <div id="globe-container" class="relative mx-auto w-[90wh] min-h-[90vh]"
+    <div id="globe-container" class="relative mx-auto w-[90wh] min-h-[70vh]"
       style="contain: layout paint size">
       <canvas id="globe-canvas" class="absolute inset-0 w-full h-full block"></canvas>
     </div>
