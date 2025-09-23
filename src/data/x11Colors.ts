@@ -1,4 +1,4 @@
-export const x11Colors = {
+export const x11Colors: Record<string, string> = {
   'AliceBlue': '#f0f8ff',
   'AntiqueWhite': '#faebd7',
   'Aqua': '#00ffff',

@@ -18,7 +18,7 @@
     "@mdi/js": "^7.4.47",
     "@tailwindcss/vite": "^4.1.11",
     "@vueuse/core": "^13.5.0",
-    "colorjs.io": "^0.5.2",
+    "colorjs.io": "0.6.0-alpha.1",
     "d3-geo": "^3.1.1",
     "tailwindcss": "^4.1.11",
     "topojson-client": "^3.1.0",
@@ -47,9 +47,9 @@
     "jsdom": "^26.1.0",
     "knip": "^5.64.0",
     "npm-run-all2": "^8.0.4",
-    "typescript": "~5.8.0",
+    "typescript": "~5.9.2",
     "vite": "^7.0.0",
-    "vite-plugin-vue-devtools": "^7.7.7",
+    "vite-plugin-vue-devtools": "^8.0.2",
     "vitest": "^3.2.4",
     "vue-tsc": "^3.0.7"
   },
@@ -60,8 +60,7 @@
       "src/**/*.vue"
     ],
     "project": [
-      "src/**",
-      "scripts/**"
+      "src/**"
     ],
     "ignore": [
       "env.d.ts"

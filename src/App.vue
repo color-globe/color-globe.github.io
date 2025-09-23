@@ -20,6 +20,8 @@ const isDev = __BUILD_ENV__ === 'development'
           </RouterLink>
           <RouterLink to="/globe" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Globe
           </RouterLink>
+          <RouterLink to="/near" class="text-gray-700 dark:text-gray-200 hover:text-blue-600 font-medium">Near
+          </RouterLink>
         </div>
         <div class="flex items-center space-x-6">
           <ThemeSelector />
