@@ -14,6 +14,11 @@ const router = createRouter({
       name: 'globe',
       component: () => import('../views/GlobeView.vue'),
     },
+    {
+      path: '/near',
+      name: 'near',
+      component: () => import('../views/NearView.vue'),
+    },
   ],
 })
 
