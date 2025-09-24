@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="7 7 50 50" fill="none">
+  <circle cx="32" cy="32" r="24" fill="url(#globeGradient)" stroke="black" stroke-width="2" />
+  <ellipse cx="32" cy="32" rx="10" ry="24" fill="none" stroke="black" stroke-width="2" />
+  <ellipse cx="32" cy="32" rx="24" ry="10" fill="none" stroke="black" stroke-width="2" />
+  <defs>
+    <linearGradient id="globeGradient" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00BCD4"/>
+      <stop offset="0.5" stop-color="#8BC34A"/>
+      <stop offset="1" stop-color="#FFC107"/>
+    </linearGradient>
+  </defs>
+</svg>
